@@ -8,11 +8,17 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
-import TablePagination from '@mui/material/TablePagination';
+import TablePagination from "@mui/material/TablePagination";
+import Button from "@mui/material/Button";
 function App() {
   const [data, setData] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
-
+  const [message, setMessage] = useState("");
+  const [state, setState] = useState({
+    data: null,
+    error: false,
+    loading: true,
+  });
   console.log(data);
   const columns = useMemo(() => [
     {
@@ -133,17 +139,16 @@ function App() {
       accessor: "volume",
     },
   ]);
+  const url = "https://callsorputs.herokuapp.com/getData";
   useEffect(() => {
     async function getData() {
-      await axios
-        .get("https://callsorputs.herokuapp.com/getData")
-        .then((response) => {
-          // check if the data is populated
-          console.log(response.data);
-          setData(response.data.items);
-          // you tell it that you had the result
-          setLoadingData(false);
-        });
+      await axios.get(url).then((response) => {
+        // check if the data is populated
+        console.log(response.data);
+        setData(response.data.items);
+        // you tell it that you had the result
+        setLoadingData(false);
+      });
     }
     if (loadingData) {
       // if the result is not ready so you make the axios call
@@ -151,37 +156,158 @@ function App() {
     }
   }, []);
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      //assign interval to a variable to clear it.
+      setState((state) => ({ data: state.data, error: false, loading: true }));
+      axios
+        .get(url)
+        .then((data) => data.json())
+        .then((obj) =>
+          Object.keys(obj).map((key) => {
+            let newData = obj[key];
+            newData.key = key;
+            return newData;
+          })
+        )
+        .then((newData) =>
+          setState({ data: newData, error: false, loading: false })
+        )
+        .catch(function (error) {
+          console.log(error);
+          setState({ data: null, error: true, loading: false });
+        });
+    }, 5000);
+
+    return () => clearInterval(intervalId); //This is important
+  }, [url, useState]);
+
   const mystyle = {
     color: "red",
     backgroundColor: "DodgerBlue",
     padding: "10px",
     fontFamily: "Arial",
   };
+  function GoldenSweeps() {
+    let golden_sweeps = [];
+    let individualElements = data.forEach((elements) => {
+      if (elements.chan_filter === "GOLDEN") golden_sweeps.push(elements);
+      console.log(golden_sweeps);
+      setData(golden_sweeps);
+    });
+  }
+
+  function allCalls() {
+    let calls = [];
+    let individualElements = data.forEach((elements) => {
+      if (elements.put_call === "CALL") calls.push(elements);
+      setData(calls);
+    });
+  }
+
+  function allPuts() {
+    let puts = [];
+    let individualElements = data.forEach((elements) => {
+      if (elements.put_call === "PUT") puts.push(elements);
+      setData(puts);
+    });
+  }
+  function Regular() {
+    window.location.reload(false);
+  }
+
+  const handleChange = (event) => {
+    setMessage(event.target.value);
+
+    console.log("value is:", event.target.value);
+  };
+
+  const handleClick = (event) => {
+    event.preventDefault();
+
+    // 👇️ value of input field
+    console.log("handleClick 👉️", message);
+    let search_stocks = [];
+    let individualElements = data.forEach((elements) => {
+      if (elements.ticker === message) search_stocks.push(elements);
+      setData(search_stocks);
+    });
+  };
 
   return (
     <>
-      <h1>Hello React!</h1>
+      <div style={{ marginLeft: "40%", marginTop: "50px" }}>
+        <Button
+          style={{ backgroundColor: "gold", marginLeft: "20px" }}
+          onClick={GoldenSweeps}
+        >
+          GOLDEN
+        </Button>
+
+        <Button
+          style={{ backgroundColor: "lightblue", marginLeft: "20px" }}
+          onClick={Regular}
+        >
+          ALL OPTIONS
+        </Button>
+
+        <Button
+          style={{ backgroundColor: "orange", marginLeft: "20px" }}
+          onClick={allPuts}
+        >
+          PUTS
+        </Button>
+
+        <Button
+          style={{ backgroundColor: "lightgreen", marginLeft: "20px" }}
+          onClick={allCalls}
+        >
+          CALLS
+        </Button>
+
+        <div>
+          <input
+            type="text"
+            id="message"
+            name="message"
+            onChange={handleChange}
+            value={message}
+            autoComplete="off"
+          />
+          <Button onClick={handleClick}>Search</Button>
+        </div>
+      </div>
       <div>
         {/* here you check if the state is loading otherwise if you wioll not call that you will get a blank page because the data is an empty array at the moment of mounting */}
         {loadingData ? (
           <p>Loading Please wait...</p>
         ) : (
           // <Table style={mystyle} columns={columns} data={data} />
-          <TableContainer component={Paper}>
-            <Table sx={{ minWidth: 650 }} aria-label="simple table">
-              <TableHead>
+          <TableContainer>
+            <Table
+              sx={{ minWidth: 650 }}
+              size="small"
+              aria-label="a dense table"
+              style={{
+                marginTop: "100px",
+
+                fontSize: "10px",
+              }}
+            >
+              <TableHead
+                style={{
+                  backgroundColor: "gray",
+                }}
+              >
                 <TableRow>
-                  <TableCell
-                    align="center"
-                    style={{ width: "20px", height: "20px" }}
-                  >
+                  <TableCell style={{ width: "50px" }} align="left">
                     Description
                   </TableCell>
-                  <TableCell align="right">.date_expiration</TableCell>
-                  <TableCell align="right">date</TableCell>
-                  <TableCell align="right">data</TableCell>
-                  <TableCell align="right">underlying_type</TableCell>
-                  <TableCell align="right">OPEN INTEREST</TableCell>
+                  <TableCell align="right">DATE_EXP</TableCell>
+                  <TableCell align="right">DATE</TableCell>
+                  {/* <TableCell align="right">data</TableCell> */}
+                  <TableCell align="right">TICKER</TableCell>
+                  <TableCell align="right">INTEREST</TableCell>
                   <TableCell align="right">size</TableCell>
                   <TableCell align="right">spot</TableCell>
                   <TableCell align="right">FILTER</TableCell>
@@ -195,6 +321,11 @@ function App() {
                   <TableRow
                     key={data.name}
                     sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
+                    style={
+                      data.chan_filter === "GOLDEN"
+                        ? { backgroundColor: "gold" }
+                        : {}
+                    }
                   >
                     <TableCell component="th" scope="data">
                       {data.description}
@@ -203,7 +334,7 @@ function App() {
                     <TableCell align="right">{data.date_expiration}</TableCell>
                     <TableCell align="right">{data.date}</TableCell>
                     <TableCell align="right">{data.volume}</TableCell>
-                    <TableCell align="right">{data.underlying_type}</TableCell>
+                    {/* <TableCell align="right">{data.tocker}</TableCell> */}
                     <TableCell align="right">{data.open_interest}</TableCell>
                     <TableCell align="right">{data.size}</TableCell>
                     <TableCell align="right">{data.spot}</TableCell>
@@ -216,15 +347,16 @@ function App() {
               </TableBody>
             </Table>
           </TableContainer>
-            <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={data.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
+
+          //   <TablePagination
+          //   rowsPerPageOptions={[5, 10, 25]}
+          //   component="div"
+          //   count={data.length}
+          //   rowsPerPage={rowsPerPage}
+          //   page={page}
+          //   onPageChange={handleChangePage}
+          //   onRowsPerPageChange={handleChangeRowsPerPage}
+          // />
         )}
       </div>
     </>
