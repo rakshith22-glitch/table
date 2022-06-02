@@ -1,25 +1,53 @@
 import React, { useMemo, useState, useEffect } from "react";
 // import Table from "./Table";
 import axios from "axios";
+import PropTypes from "prop-types";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
+import TableFooter from "@mui/material/TableFooter";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Paper from "@mui/material/Paper";
 import TablePagination from "@mui/material/TablePagination";
 import Button from "@mui/material/Button";
+import Badge from "react-bootstrap/Badge";
+import { useTheme } from "@mui/material/styles";
+import IconButton from "@mui/material/IconButton";
+import FirstPageIcon from "@mui/icons-material/FirstPage";
+import KeyboardArrowLeft from "@mui/icons-material/KeyboardArrowLeft";
+import KeyboardArrowRight from "@mui/icons-material/KeyboardArrowRight";
+import LastPageIcon from "@mui/icons-material/LastPage";
+import Box from "@mui/material/Box";
+import bullsbears from "./bullsbears.jpg";
+import TableSortLabel from "@mui/material/TableSortLabel";
+import TextField from "@mui/material/TextField";
 function App() {
   const [data, setData] = useState([]);
+  const [sweeplength, setsweeplength] = useState("");
   const [loadingData, setLoadingData] = useState(true);
   const [message, setMessage] = useState("");
-  const [state, setState] = useState({
-    data: null,
-    error: false,
-    loading: true,
-  });
-  console.log(data);
+  const [data2, setData2] = useState([]);
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+  const [rows, setrows] = useState([]);
+
+  // Avoid a layout jump when reaching the last page with empty rows.
+  const emptyRows =
+    page > 0 ? Math.max(0, (1 + page) * rowsPerPage - rows.length) : 0;
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  let new_golden_sweeps = [];
+  const url = "https://callsorputs.herokuapp.com/getData";
   const columns = useMemo(() => [
     {
       Header: "DTE",
@@ -139,7 +167,9 @@ function App() {
       accessor: "volume",
     },
   ]);
-  const url = "https://callsorputs.herokuapp.com/getData";
+
+  // ---------------------------------------------------------- TABLE DATA -------------------------------------------------//
+
   useEffect(() => {
     async function getData() {
       await axios.get(url).then((response) => {
@@ -147,6 +177,29 @@ function App() {
         console.log(response.data);
         setData(response.data.items);
         // you tell it that you had the result
+        setLoadingData(false);
+        setrows(response.data.items);
+      });
+    }
+    if (loadingData) {
+      // if the result is not ready so you make the axios call
+      getData();
+    }
+  }, []);
+
+  // ---------------------------------------------------------- Notification Button  -------------------------------------------------//
+  useEffect(() => {
+    async function getData() {
+      await axios.get(url).then((response) => {
+        // check if the data is populated
+        console.log(response.data);
+        setData(response.data.items);
+        response.data.items.forEach((elements) => {
+          if (elements.chan_filter === "GOLDEN")
+            new_golden_sweeps.push(elements);
+          setsweeplength(new_golden_sweeps.length / 2);
+        });
+        console.log("new_golden_sweeps.length", new_golden_sweeps.length);
         setLoadingData(false);
       });
     }
@@ -156,60 +209,27 @@ function App() {
     }
   }, []);
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      //assign interval to a variable to clear it.
-      setState((state) => ({ data: state.data, error: false, loading: true }));
-      axios
-        .get(url)
-        .then((data) => data.json())
-        .then((obj) =>
-          Object.keys(obj).map((key) => {
-            let newData = obj[key];
-            newData.key = key;
-            return newData;
-          })
-        )
-        .then((newData) =>
-          setState({ data: newData, error: false, loading: false })
-        )
-        .catch(function (error) {
-          console.log(error);
-          setState({ data: null, error: true, loading: false });
-        });
-    }, 5000);
-
-    return () => clearInterval(intervalId); //This is important
-  }, [url, useState]);
-
-  const mystyle = {
-    color: "red",
-    backgroundColor: "DodgerBlue",
-    padding: "10px",
-    fontFamily: "Arial",
-  };
   function GoldenSweeps() {
     let golden_sweeps = [];
-    let individualElements = data.forEach((elements) => {
+    data.forEach((elements) => {
       if (elements.chan_filter === "GOLDEN") golden_sweeps.push(elements);
-      console.log(golden_sweeps);
-      setData(golden_sweeps);
+      setrows(golden_sweeps);
     });
   }
 
   function allCalls() {
     let calls = [];
-    let individualElements = data.forEach((elements) => {
+    data.forEach((elements) => {
       if (elements.put_call === "CALL") calls.push(elements);
-      setData(calls);
+      setrows(calls);
     });
   }
 
   function allPuts() {
     let puts = [];
-    let individualElements = data.forEach((elements) => {
+    data.forEach((elements) => {
       if (elements.put_call === "PUT") puts.push(elements);
-      setData(puts);
+      setrows(puts);
     });
   }
   function Regular() {
@@ -217,7 +237,7 @@ function App() {
   }
 
   const handleChange = (event) => {
-    setMessage(event.target.value);
+    setMessage(event.target.value.toUpperCase());
 
     console.log("value is:", event.target.value);
   };
@@ -230,54 +250,180 @@ function App() {
     let search_stocks = [];
     let individualElements = data.forEach((elements) => {
       if (elements.ticker === message) search_stocks.push(elements);
-      setData(search_stocks);
+      setrows(search_stocks);
     });
+  };
+
+  function TablePaginationActions(props) {
+    const theme = useTheme();
+    const { count, page, rowsPerPage, onPageChange } = props;
+
+    const handleFirstPageButtonClick = (event) => {
+      onPageChange(event, 0);
+    };
+
+    const handleBackButtonClick = (event) => {
+      onPageChange(event, page - 1);
+    };
+
+    const handleNextButtonClick = (event) => {
+      onPageChange(event, page + 1);
+    };
+
+    const handleLastPageButtonClick = (event) => {
+      onPageChange(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1));
+    };
+
+    return (
+      <Box sx={{ flexShrink: 0, ml: 2.5 }}>
+        <IconButton
+          onClick={handleFirstPageButtonClick}
+          disabled={page === 0}
+          aria-label="first page"
+        >
+          {theme.direction === "rtl" ? <LastPageIcon /> : <FirstPageIcon />}
+        </IconButton>
+        <IconButton
+          onClick={handleBackButtonClick}
+          disabled={page === 0}
+          aria-label="previous page"
+        >
+          {theme.direction === "rtl" ? (
+            <KeyboardArrowRight />
+          ) : (
+            <KeyboardArrowLeft />
+          )}
+        </IconButton>
+        <IconButton
+          onClick={handleNextButtonClick}
+          disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+          aria-label="next page"
+        >
+          {theme.direction === "rtl" ? (
+            <KeyboardArrowLeft />
+          ) : (
+            <KeyboardArrowRight />
+          )}
+        </IconButton>
+        <IconButton
+          onClick={handleLastPageButtonClick}
+          disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+          aria-label="last page"
+        >
+          {theme.direction === "rtl" ? <FirstPageIcon /> : <LastPageIcon />}
+        </IconButton>
+      </Box>
+    );
+  }
+
+  TablePaginationActions.propTypes = {
+    count: PropTypes.number.isRequired,
+    onPageChange: PropTypes.func.isRequired,
+    page: PropTypes.number.isRequired,
+    rowsPerPage: PropTypes.number.isRequired,
   };
 
   return (
     <>
-      <div style={{ marginLeft: "40%", marginTop: "50px" }}>
+      <div style={{ height: "100px", marginTop: "25px", marginLeft: "20%" }}>
+        <img
+          src={bullsbears}
+          alt="bullsbears"
+          style={{ width: "80%", height: "200px" }}
+        />
+      </div>
+      <div
+        style={{
+          marginLeft: "35%",
+          marginTop: "50px",
+        }}
+      >
         <Button
-          style={{ backgroundColor: "gold", marginLeft: "20px" }}
+          style={{
+            backgroundColor: "gold",
+            marginLeft: "20px",
+            color: "black",
+            fontWeight: "bold",
+          }}
           onClick={GoldenSweeps}
         >
+          <Button style={{ color: "red" }}>
+            <span class="material-icons">notifications</span>
+            <span
+              class="icon-button__badge"
+              style={{ color: "red", color: "blue", fontWeight: "bold" }}
+            >
+              {sweeplength}
+            </span>
+          </Button>
           GOLDEN
         </Button>
 
         <Button
-          style={{ backgroundColor: "lightblue", marginLeft: "20px" }}
+          style={{
+            backgroundColor: "lightblue",
+            marginLeft: "20px",
+            color: "black",
+            fontWeight: "bold",
+          }}
           onClick={Regular}
         >
           ALL OPTIONS
         </Button>
 
         <Button
-          style={{ backgroundColor: "orange", marginLeft: "20px" }}
+          style={{
+            backgroundColor: "orange",
+            marginLeft: "20px",
+            color: "black",
+            fontWeight: "bold",
+          }}
           onClick={allPuts}
         >
           PUTS
         </Button>
 
         <Button
-          style={{ backgroundColor: "lightgreen", marginLeft: "20px" }}
+          style={{
+            backgroundColor: "lightgreen",
+            marginLeft: "20px",
+            color: "black",
+            fontWeight: "bold",
+          }}
           onClick={allCalls}
         >
           CALLS
         </Button>
 
-        <div>
-          <input
-            type="text"
-            id="message"
-            name="message"
-            onChange={handleChange}
-            value={message}
-            autoComplete="off"
-          />
-          <Button onClick={handleClick}>Search</Button>
-        </div>
+        <TextField
+          id="message"
+          name="message"
+          label="TICKER SYMBOL"
+          onChange={handleChange}
+          value={message}
+          variant="filled"
+          style={{
+            marginLeft: "50px",
+            marginRight: "5px",
+            width: "300px",
+            marginTop: "-10px",
+            borderColor: "black",
+            backgroundColor: "white",
+          }}
+        />
+        <Button
+          style={{
+            backgroundColor: "pink",
+            color: "black",
+            fontWeight: "bold",
+          }}
+          onClick={handleClick}
+        >
+          Search
+        </Button>
       </div>
-      <div>
+
+      <div style={{ width: "80%", marginLeft: "10%" }}>
         {/* here you check if the state is loading otherwise if you wioll not call that you will get a blank page because the data is an empty array at the moment of mounting */}
         {loadingData ? (
           <p>Loading Please wait...</p>
@@ -289,74 +435,183 @@ function App() {
               size="small"
               aria-label="a dense table"
               style={{
-                marginTop: "100px",
-
+                marginTop: "20px",
+                backgroundColor: "antiquewhite",
+                border: "3px solid black",
                 fontSize: "10px",
               }}
             >
               <TableHead
                 style={{
                   backgroundColor: "gray",
+                  height: "60px",
                 }}
               >
                 <TableRow>
-                  <TableCell style={{ width: "50px" }} align="left">
+                  <TableCell
+                    style={{ width: "20px", fontWeight: "bold" }}
+                    align="center"
+                  >
+                    TICKER
+                  </TableCell>
+                  <TableCell
+                    style={{ width: "120px", fontWeight: "bold" }}
+                    align="center"
+                  >
                     Description
                   </TableCell>
-                  <TableCell align="right">DATE_EXP</TableCell>
-                  <TableCell align="right">DATE</TableCell>
+                  <TableCell
+                    style={{ width: "20px", fontWeight: "bold" }}
+                    align="right"
+                  >
+                    DATE_EXP
+                  </TableCell>
+                  <TableCell
+                    style={{ width: "20px", fontWeight: "bold" }}
+                    align="center"
+                  >
+                    DATE
+                  </TableCell>
                   {/* <TableCell align="right">data</TableCell> */}
-                  <TableCell align="right">TICKER</TableCell>
-                  <TableCell align="right">INTEREST</TableCell>
-                  <TableCell align="right">size</TableCell>
-                  <TableCell align="right">spot</TableCell>
-                  <TableCell align="right">FILTER</TableCell>
-                  <TableCell align="right">put_call</TableCell>
-                  <TableCell align="right">sentiment</TableCell>
-                  <TableCell align="right">price</TableCell>
+
+                  <TableCell
+                    style={{ width: "20px", fontWeight: "bold" }}
+                    align="center"
+                  >
+                    INTEREST
+                  </TableCell>
+                  <TableCell
+                    style={{ width: "20px", fontWeight: "bold" }}
+                    align="center"
+                  >
+                    OPTIONS SIZE
+                  </TableCell>
+                  <TableCell
+                    style={{ width: "20px", fontWeight: "bold" }}
+                    align="right"
+                  >
+                    SPOT
+                  </TableCell>
+                  <TableCell
+                    style={{ width: "20px", fontWeight: "bold" }}
+                    align="center"
+                  >
+                    PRICE
+                  </TableCell>
+                  <TableCell
+                    style={{ width: "20px", fontWeight: "bold" }}
+                    align="left"
+                  >
+                    PUT/CALL-SNTMNT
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.map((data) => (
+                {(rowsPerPage > 0
+                  ? rows.slice(
+                      page * rowsPerPage,
+                      page * rowsPerPage + rowsPerPage
+                    )
+                  : rows
+                ).map((data) => (
                   <TableRow
                     key={data.name}
-                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
                     style={
                       data.chan_filter === "GOLDEN"
                         ? { backgroundColor: "gold" }
                         : {}
                     }
                   >
-                    <TableCell component="th" scope="data">
+                    {/* <TableCell component="th" scope="data">
+                      {data.description}
+                    </TableCell> */}
+                    <TableCell
+                      style={{ width: "20px", fontWeight: "bold" }}
+                      align="center"
+                    >
+                      {data.ticker}
+                    </TableCell>
+                    <TableCell style={{ width: "120px" }} align="right">
                       {data.description}
                     </TableCell>
+                    <TableCell
+                      style={{ width: "30px", paddingRight: "40px" }}
+                      align="right"
+                    >
+                      {data.date_expiration}
+                    </TableCell>
+                    <TableCell
+                      style={{ width: "50px", paddingRight: "40px" }}
+                      align="right"
+                    >
+                      {data.date}
+                    </TableCell>
+                    {/* <TableCell align="right">{data.volume}</TableCell> */}
 
-                    <TableCell align="right">{data.date_expiration}</TableCell>
-                    <TableCell align="right">{data.date}</TableCell>
-                    <TableCell align="right">{data.volume}</TableCell>
-                    {/* <TableCell align="right">{data.tocker}</TableCell> */}
-                    <TableCell align="right">{data.open_interest}</TableCell>
-                    <TableCell align="right">{data.size}</TableCell>
-                    <TableCell align="right">{data.spot}</TableCell>
-                    <TableCell align="right">{data.chan_filter}</TableCell>
-                    <TableCell align="right">{data.put_call}</TableCell>
-                    <TableCell align="right">{data.sentiment}</TableCell>
-                    <TableCell align="right">{data.price}</TableCell>
+                    <TableCell style={{ width: "20px" }} align="center">
+                      {data.open_interest}
+                    </TableCell>
+                    <TableCell style={{ width: "20px" }} align="center">
+                      {data.size}
+                    </TableCell>
+                    <TableCell style={{ width: "20px" }} align="right">
+                      {data.spot}
+                    </TableCell>
+                    {/* <TableCell style={{ width: "20px" }} align="right">
+                      {data.chan_filter}
+                    </TableCell> */}
+                    <TableCell
+                      style={{
+                        width: "20px",
+                        fontWeight: "bold",
+                        color: "red",
+                      }}
+                      align="center"
+                    >
+                      {data.price}
+                    </TableCell>
+                    <TableCell
+                      style={
+                        data.put_call === "CALL"
+                          ? {
+                              backgroundColor: "lightgreen",
+                              fontWeight: "bold",
+                            }
+                          : { backgroundColor: "orange", fontWeight: "bold" }
+                      }
+                      align="center"
+                    >
+                      {data.put_call} - {data.sentiment}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            <div style={{ marginLeft: "40%" }}>
+              <TablePagination
+                rowsPerPageOptions={[
+                  10,
+                  20,
+                  30,
+                  50,
+                  { label: "All", value: -1 },
+                ]}
+                colSpan={3}
+                count={rows.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                SelectProps={{
+                  inputProps: {
+                    "aria-label": "rows per page",
+                  },
+                  native: true,
+                }}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                ActionsComponent={TablePaginationActions}
+              />
+            </div>
           </TableContainer>
-
-          //   <TablePagination
-          //   rowsPerPageOptions={[5, 10, 25]}
-          //   component="div"
-          //   count={data.length}
-          //   rowsPerPage={rowsPerPage}
-          //   page={page}
-          //   onPageChange={handleChangePage}
-          //   onRowsPerPageChange={handleChangeRowsPerPage}
-          // />
         )}
       </div>
     </>
